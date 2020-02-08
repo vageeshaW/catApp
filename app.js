@@ -13,11 +13,9 @@ app.set('port', process.env.PORT || 4000);
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-//app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/', routes.index);
 app.get('/breeds', breeds.list);
-//app.get('/breeds/add', breeds.add);
 app.post('/breeds/add', breeds.save);
 app.get('/breeds/delete/:id', breeds.delete);
 app.delete('/breeds/delete/:id', breeds.delete);
