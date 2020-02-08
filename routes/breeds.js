@@ -1,9 +1,20 @@
 require("dotenv").config();
-
+const axios = require('axios');
+const pgp = require('pg-promise')({
+  capSQL:true
+})
 const { Pool } = require("pg");
 
 const connectionString = `postgresql://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_DATABASE}`;
 
+const cn = {
+  host:process.env.DB_HOST, // 'localhost' is the default;
+  port:process.env.DB_PORT, // 5432 is the default;
+  database:process.env.DB_DATABASE,
+  user:process.env.DB_USER,
+  password:process.env.DB_PASSWORD
+};
+const db = pgp(cn);
 const pool = new Pool({
   connectionString: connectionString
 });
@@ -58,32 +69,29 @@ exports.list = function(req, res) {
     });
 };
 
-const executeQuery = async function(query) {
+const executeQuery = async (query)=> {
   let response;
   try {
     response = await pool.query(query);
     return { success: true, data: response.rows };
-  } catch {
+  } catch(err) {
+    return { success: false };
+  }
+};
+const executeAddQuery = async (query,params)=> {
+  let response;
+  try {
+    response = await pool.query(query,params);
+    return { success: true, data: response.rows };
+  } catch(err) {
     return { success: false };
   }
 };
 
 
-exports.edit = function(req, res) {
-  var id = req.params.id;
+exports.add = function(req, res) {
 
-  pool.query("SELECT * FROM breeds WHERE id=$1", [id], function(err, result) {
-    if (err) {
-      console.log(err);
-      res.status(400).send(err);
-    }
-    console.log("200");
-  });
-};
-
-exports.save = function(req, res) {
-  console.log(req.body);
-  // var cols = [req.body.adaptability, req.body.affection_level, req.body.child_friendly, req.body.description,req.body.energy_level,req.body.name, req.body.weight, req.body.stranger_friendly];
+  let addQuery = "";
   const {
     adaptability,
     affection_level,
@@ -94,58 +102,119 @@ exports.save = function(req, res) {
     weight,
     stranger_friendly
   } = req.body;
-  console.log(adaptability, affection_level, child_friendly);
-  pool.query(
-    "INSERT INTO breeds(adaptability, affection_level, child_friendly, description, energy_level, name, weight, stranger_friendly) VALUES($1, $2, $3, $4, $5, $6, $7, $8)",
-    [
-      adaptability,
-      affection_level,
-      child_friendly,
-      description,
-      energy_level,
-      name,
-      weight,
-      stranger_friendly
-    ],
-    function(err, result) {
-      if (err) {
-        console.log("Error Saving : %s ", err);
+  addQuery = `INSERT INTO breeds(adaptability, affection_level, child_friendly, description, energy_level, name, weight, stranger_friendly) VALUES($1, $2, $3, $4, $5, $6, $7, $8) `;
+  
+  let dataArray=[
+    adaptability,
+    affection_level,
+    child_friendly,
+    description,
+    energy_level,
+    name,
+    weight,
+    stranger_friendly
+  ]
+;
+    executeAddQuery(addQuery,dataArray)
+    .then( addResult => {
+        if(!addResult.success){
+            throw {error: " Error in  add query "}
+        }
+        return res.status(200).json({
+            success: true,
+            data: addResult.data
+          });
+    }
+
+    )
+    .catch(err => {
+        res.status(400).send({ success: false, ...err });
+      });
+  
+
+};
+
+// exports.edit = function(req, res) {
+//     pool.query("SELECT * FROM breeds WHERE id=$1", [id], function(err, result) {
+//         if (err) {
+//           console.log(err);
+//           res.status(400).send(err);
+//         }
+//         console.log("200");
+//       });
+//     var id = req.params.id;
+//     exports.update = function(req, res) {
+//       var cols = [
+//         req.body.name,
+//         req.body.address,
+//         req.body.email,
+//         req.body.phone,
+//         req.params.id
+//       ];
+    
+//       pool.query(
+//         "UPDATE breeds SET name=$1, address=$2,email=$3, phone=$4 WHERE id=$5",
+//         cols,
+//         function(err, result) {
+//           if (err) {
+//             console.log("Error Updating : %s ", err);
+//           }
+//           console.log("200");
+//         }
+//       );
+//     };
+//   };
+
+exports.feedData = (req, res) =>{
+ 
+  axios({
+    url: 'https://api.thecatapi.com/v1/breeds',
+    method: 'get',
+    headers: { 'x-api-key': process.env.API_KEY }
+  })
+  .then(response => {
+    let newArray = response.data.map(obj => {
+      let newObj = {
+        adaptability:obj.adaptability,
+        affection_level:obj.affection_level,
+        child_friendly:obj.child_friendly,
+        description:obj.description,
+        energy_level:obj.energy_level,
+        name:obj.name,
+        weight:obj.weight,
+        stranger_friendly:obj.stranger_friendly
       }
+      
+      return newObj
+   })
+    console.log(newArray);
+    return executeAddManyQuery(newArray);
+  }).then( (result)=> {
+    console.log(result);
+  }
 
-      res.status(200).json(result);
-      console.log("added");
+  )
+  .catch(error => {
+    console.log(error);
+  });}
+
+
+  const executeAddManyQuery = async (data)=> {
+    const cs = new pgp.helpers.ColumnSet([ 'adaptability',
+      'affection_level',
+      'child_friendly',
+      'description',
+      'energy_level',
+      'name',
+      'weight',
+      'stranger_friendly'], {table: 'breeds'});
+    const values = data;
+    try {
+      const query = pgp.helpers.insert(values, cs);
+      response = await db.none(query);//null
+      return { success: true, data:data };
+    } catch(err) {
+      return { success: false };
     }
-  );
-};
+  };
 
-exports.update = function(req, res) {
-  var cols = [
-    req.body.name,
-    req.body.address,
-    req.body.email,
-    req.body.phone,
-    req.params.id
-  ];
-
-  pool.query(
-    "UPDATE breeds SET name=$1, address=$2,email=$3, phone=$4 WHERE id=$5",
-    cols,
-    function(err, result) {
-      if (err) {
-        console.log("Error Updating : %s ", err);
-      }
-      console.log("200");
-    }
-  );
-};
-
-exports.delete = function(req, res) {
-  var id = req.params.id;
-
-  pool.query("DELETE FROM breeds WHERE id=$1", [id], function(err, rows) {
-    if (err) {
-      console.log("Error deleting : %s ", err);
-    }
-    console.log("deleted");
-  });
-};

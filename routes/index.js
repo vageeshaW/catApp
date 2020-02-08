@@ -1,3 +1,3 @@
 exports.index = function (req, res) {
-    res.render('index', { title: 'NodeJs & PostgreSQL Crud' });
+    res.render('index', { title: 'cat Data' });
 };
