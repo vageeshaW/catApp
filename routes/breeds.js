@@ -60,7 +60,7 @@ exports.list = function(req, res) {
       }
       return res.status(200).json({
         success: true,
-        pagination: { pageSize, page, total: totalNumbers },
+        pagination: { pageSize:Number(pageSize), page:Number(page), total: totalNumbers },
         data: data.data
       });
     })
@@ -190,7 +190,10 @@ exports.feedData = (req, res) =>{
     console.log(newArray);
     return executeAddManyQuery(newArray);
   }).then( (result)=> {
-    console.log(result);
+    return res.status(200).json({
+      success: true,
+      data:{message:"data populated"}
+    });
   }
 
   )
